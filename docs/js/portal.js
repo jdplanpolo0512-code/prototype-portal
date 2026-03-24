@@ -1,3 +1,5 @@
+let tagMap = {};
+
 document.addEventListener('DOMContentLoaded', () => {
   const tabBtns = document.querySelectorAll('.tab-btn');
   tabBtns.forEach(btn => {
@@ -14,8 +16,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function loadData() {
   const data = Storage.load();
+  if (!data.tags) data.tags = [];
+  tagMap = {};
+  data.tags.forEach(t => { tagMap[t.id] = t; });
+  renderTagFilter(data);
   renderCardView(data);
   renderTableView(data);
+}
+
+let activeFilterTag = null;
+
+function renderTagFilter({ tags }) {
+  const filterArea = document.getElementById('tag-filter');
+  if (!filterArea) return;
+  if (!tags || tags.length === 0) {
+    filterArea.style.display = 'none';
+    return;
+  }
+  filterArea.style.display = 'flex';
+  filterArea.innerHTML =
+    `<span class="tag-chip ${activeFilterTag === null ? 'selected' : ''}" style="background:#4b5563" onclick="filterByTag(null)">전체</span>` +
+    tags.map(t =>
+      `<span class="tag-chip ${activeFilterTag === t.id ? 'selected' : ''}" style="background:${escapeHtml(t.color)}" onclick="filterByTag('${t.id}')">${escapeHtml(t.name)}</span>`
+    ).join('');
+}
+
+function filterByTag(tagId) {
+  activeFilterTag = tagId;
+  loadData();
+}
+
+function getFilteredProjects(projects) {
+  if (activeFilterTag === null) return projects;
+  return projects.filter(p => (p.tagIds || []).includes(activeFilterTag));
 }
 
 function openPrototype(id) {
@@ -29,20 +62,35 @@ function openPrototype(id) {
   window.open(url, '_blank');
 }
 
+function renderProjectTags(tagIds) {
+  if (!tagIds || tagIds.length === 0) return '';
+  return tagIds.map(tid => {
+    const tag = tagMap[tid];
+    return tag ? `<span class="tag-badge" style="background:${escapeHtml(tag.color)}">${escapeHtml(tag.name)}</span>` : '';
+  }).join('');
+}
+
 function renderCardView({ projects, prototypes }) {
   const container = document.getElementById('tab-card');
+  const filtered = getFilteredProjects(projects);
 
-  if (projects.length === 0) {
-    container.innerHTML = '<div class="empty-state"><p>등록된 프로젝트가 없습니다. Admin 페이지에서 프로젝트를 추가해주세요.</p></div>';
+  if (filtered.length === 0) {
+    container.innerHTML = projects.length === 0
+      ? '<div class="empty-state"><p>등록된 프로젝트가 없습니다. Admin 페이지에서 프로젝트를 추가해주세요.</p></div>'
+      : '<div class="empty-state"><p>선택한 태그에 해당하는 프로젝트가 없습니다.</p></div>';
     return;
   }
 
-  const html = '<div class="card-grid">' + projects.map(project => {
+  const html = '<div class="card-grid">' + filtered.map(project => {
     const protos = prototypes.filter(p => p.projectId === project.id);
+    const tagsHtml = renderProjectTags(project.tagIds);
     return `
       <div class="project-card">
         <div class="card-header">
-          <h3>${escapeHtml(project.name)}</h3>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <h3 style="margin:0;">${escapeHtml(project.name)}</h3>
+            ${tagsHtml}
+          </div>
           ${project.description ? `<p>${escapeHtml(project.description)}</p>` : ''}
         </div>
         <div class="card-body">
@@ -68,20 +116,24 @@ function renderCardView({ projects, prototypes }) {
 
 function renderTableView({ projects, prototypes }) {
   const container = document.getElementById('tab-table');
+  const filtered = getFilteredProjects(projects);
+  const filteredIds = new Set(filtered.map(p => p.id));
+  const filteredPrototypes = prototypes.filter(p => filteredIds.has(p.projectId));
 
-  if (prototypes.length === 0) {
+  if (filteredPrototypes.length === 0) {
     container.innerHTML = '<div class="empty-state"><p>등록된 프로토타입이 없습니다.</p></div>';
     return;
   }
 
   const projectMap = {};
-  projects.forEach(p => { projectMap[p.id] = p.name; });
+  projects.forEach(p => { projectMap[p.id] = p; });
 
   const html = `
     <table class="data-table">
       <thead>
         <tr>
           <th>프로젝트</th>
+          <th>제품</th>
           <th>프로토타입</th>
           <th>파일명</th>
           <th>등록일</th>
@@ -89,9 +141,13 @@ function renderTableView({ projects, prototypes }) {
         </tr>
       </thead>
       <tbody>
-        ${prototypes.map(proto => `
+        ${filteredPrototypes.map(proto => {
+          const proj = projectMap[proto.projectId];
+          const tagsHtml = proj ? renderProjectTags(proj.tagIds) : '';
+          return `
           <tr>
-            <td><span class="badge">${escapeHtml(projectMap[proto.projectId] || '-')}</span></td>
+            <td><span class="badge">${escapeHtml(proj ? proj.name : '-')}</span></td>
+            <td>${tagsHtml || '<span style="color:#9ca3af">-</span>'}</td>
             <td>${escapeHtml(proto.name)}</td>
             <td style="color:#6b7280;font-size:13px;">${escapeHtml(proto.fileName || '-')}</td>
             <td>${proto.createdAt}</td>
@@ -102,7 +158,7 @@ function renderTableView({ projects, prototypes }) {
               </div>
             </td>
           </tr>
-        `).join('')}
+        `}).join('')}
       </tbody>
     </table>
   `;

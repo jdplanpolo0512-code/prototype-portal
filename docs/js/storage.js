@@ -2,7 +2,7 @@ const Storage = {
   _key: 'prototype-portal-data',
   _filesKey: 'prototype-portal-files',
 
-  _defaultData: { projects: [], prototypes: [] },
+  _defaultData: { projects: [], prototypes: [], tags: [] },
 
   load() {
     try {
