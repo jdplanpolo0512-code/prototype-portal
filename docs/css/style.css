@@ -70,14 +70,13 @@ body {
 
 /* Tabs */
 .tabs {
-  display: flex;
+  display: inline-flex;
   gap: 4px;
   margin-bottom: 28px;
   background: #fff;
   border-radius: 12px;
   padding: 4px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  display: inline-flex;
 }
 
 .tab-btn {

@@ -1,14 +1,31 @@
 let tagMap = {};
+let activeFilterTag = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  tabBtns.forEach(btn => {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      tabBtns.forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
     });
+  });
+
+  // Event delegation for dynamic buttons
+  document.addEventListener('click', (e) => {
+    const protoBtn = e.target.closest('[data-action="open-proto"]');
+    if (protoBtn) {
+      const id = protoBtn.dataset.protoId;
+      if (Storage.isValidId(id)) openPrototype(id);
+      return;
+    }
+
+    const filterBtn = e.target.closest('[data-action="filter-tag"]');
+    if (filterBtn) {
+      const tagId = filterBtn.dataset.tagId || null;
+      filterByTag(tagId);
+      return;
+    }
   });
 
   loadData();
@@ -16,15 +33,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function loadData() {
   const data = Storage.load();
-  if (!data.tags) data.tags = [];
   tagMap = {};
   data.tags.forEach(t => { tagMap[t.id] = t; });
   renderTagFilter(data);
   renderCardView(data);
   renderTableView(data);
 }
-
-let activeFilterTag = null;
 
 function renderTagFilter({ tags }) {
   const filterArea = document.getElementById('tag-filter');
@@ -35,14 +49,14 @@ function renderTagFilter({ tags }) {
   }
   filterArea.style.display = 'flex';
   filterArea.innerHTML =
-    `<span class="tag-chip ${activeFilterTag === null ? 'selected' : ''}" style="background:#4b5563" onclick="filterByTag(null)">전체</span>` +
+    `<span class="tag-chip ${activeFilterTag === null ? 'selected' : ''}" style="background:#4b5563" data-action="filter-tag" data-tag-id="">전체</span>` +
     tags.map(t =>
-      `<span class="tag-chip ${activeFilterTag === t.id ? 'selected' : ''}" style="background:${escapeHtml(t.color)}" onclick="filterByTag('${t.id}')">${escapeHtml(t.name)}</span>`
+      `<span class="tag-chip ${activeFilterTag === t.id ? 'selected' : ''}" style="background:${sanitizeColor(t.color)}" data-action="filter-tag" data-tag-id="${escapeAttr(t.id)}">${escapeHtml(t.name)}</span>`
     ).join('');
 }
 
 function filterByTag(tagId) {
-  activeFilterTag = tagId;
+  activeFilterTag = tagId || null;
   loadData();
 }
 
@@ -57,16 +71,26 @@ function openPrototype(id) {
     alert('HTML 파일을 찾을 수 없습니다.');
     return;
   }
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank');
+  // Open in a new window with a sandboxed iframe to prevent access to parent origin
+  const viewer = window.open('', '_blank');
+  if (!viewer) {
+    alert('팝업이 차단되었습니다. 팝업 차단을 해제해주세요.');
+    return;
+  }
+  viewer.document.write(`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Prototype Viewer</title>
+<style>*{margin:0;padding:0;}iframe{width:100%;height:100vh;border:none;}</style>
+</head><body>
+<iframe sandbox="allow-scripts allow-same-origin allow-forms allow-popups" srcdoc="${escapeAttr(html)}"></iframe>
+</body></html>`);
+  viewer.document.close();
 }
 
 function renderProjectTags(tagIds) {
   if (!tagIds || tagIds.length === 0) return '';
   return tagIds.map(tid => {
     const tag = tagMap[tid];
-    return tag ? `<span class="tag-badge" style="background:${escapeHtml(tag.color)}">${escapeHtml(tag.name)}</span>` : '';
+    return tag ? `<span class="tag-badge" style="background:${sanitizeColor(tag.color)}">${escapeHtml(tag.name)}</span>` : '';
   }).join('');
 }
 
@@ -96,15 +120,17 @@ function renderCardView({ projects, prototypes }) {
         <div class="card-body">
           ${protos.length === 0
             ? '<p style="color:#9ca3af;font-size:13px;padding:10px 0;">프로토타입 없음</p>'
-            : protos.map(proto => `
+            : protos.map(proto => {
+              const figmaHref = sanitizeUrl(proto.figmaUrl);
+              return `
               <div class="proto-item">
                 <span class="proto-name">${escapeHtml(proto.name)}</span>
                 <div class="proto-links">
-                  ${proto.figmaUrl ? `<a href="${escapeHtml(proto.figmaUrl)}" target="_blank" class="btn btn-figma">Figma</a>` : ''}
-                  <button onclick="openPrototype('${proto.id}')" class="btn btn-primary">HTML</button>
+                  ${figmaHref ? `<a href="${escapeAttr(figmaHref)}" target="_blank" rel="noopener noreferrer" class="btn btn-figma">Figma</a>` : ''}
+                  <button data-action="open-proto" data-proto-id="${escapeAttr(proto.id)}" class="btn btn-primary">HTML</button>
                 </div>
               </div>
-            `).join('')
+            `}).join('')
           }
         </div>
       </div>
@@ -144,17 +170,18 @@ function renderTableView({ projects, prototypes }) {
         ${filteredPrototypes.map(proto => {
           const proj = projectMap[proto.projectId];
           const tagsHtml = proj ? renderProjectTags(proj.tagIds) : '';
+          const figmaHref = sanitizeUrl(proto.figmaUrl);
           return `
           <tr>
             <td><span class="badge">${escapeHtml(proj ? proj.name : '-')}</span></td>
             <td>${tagsHtml || '<span style="color:#9ca3af">-</span>'}</td>
             <td>${escapeHtml(proto.name)}</td>
-            <td style="color:#6b7280;font-size:13px;">${escapeHtml(proto.fileName || '-')}</td>
-            <td>${proto.createdAt}</td>
+            <td style="color:#6b7280;font-size:13px;">${escapeHtml(proto.fileName)}</td>
+            <td>${escapeHtml(proto.createdAt)}</td>
             <td>
               <div class="proto-links">
-                ${proto.figmaUrl ? `<a href="${escapeHtml(proto.figmaUrl)}" target="_blank" class="btn btn-figma">Figma</a>` : ''}
-                <button onclick="openPrototype('${proto.id}')" class="btn btn-primary">HTML</button>
+                ${figmaHref ? `<a href="${escapeAttr(figmaHref)}" target="_blank" rel="noopener noreferrer" class="btn btn-figma">Figma</a>` : ''}
+                <button data-action="open-proto" data-proto-id="${escapeAttr(proto.id)}" class="btn btn-primary">HTML</button>
               </div>
             </td>
           </tr>
@@ -164,10 +191,4 @@ function renderTableView({ projects, prototypes }) {
   `;
 
   container.innerHTML = html;
-}
-
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
 }

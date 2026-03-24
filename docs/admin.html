@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self';">
   <title>Admin - Prototype Portal</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -12,7 +13,7 @@
     <nav>
       <a href="index.html">Portal</a>
       <a href="admin.html" class="active">Admin</a>
-      <a href="#" id="logout-btn" style="display:none;" onclick="logout()">Logout</a>
+      <a href="#" id="logout-btn" style="display:none;">Logout</a>
     </nav>
   </div>
 
@@ -38,9 +39,9 @@
   <div class="container" id="admin-content" style="display:none;">
     <!-- Admin Tabs -->
     <div class="admin-tabs">
-      <button class="admin-tab-btn active" data-tab="projects" onclick="switchAdminTab('projects')">프로젝트 관리</button>
-      <button class="admin-tab-btn" data-tab="prototypes" onclick="switchAdminTab('prototypes')">프로토타입 등록</button>
-      <button class="admin-tab-btn" data-tab="tags" onclick="switchAdminTab('tags')">제품 태그 관리</button>
+      <button class="admin-tab-btn active" data-action="switch-tab" data-tab="projects">프로젝트 관리</button>
+      <button class="admin-tab-btn" data-action="switch-tab" data-tab="prototypes">프로토타입 등록</button>
+      <button class="admin-tab-btn" data-action="switch-tab" data-tab="tags">제품 태그 관리</button>
     </div>
 
     <!-- Projects Tab -->

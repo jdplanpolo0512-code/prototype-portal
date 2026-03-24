@@ -25,6 +25,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  document.getElementById('logout-btn').addEventListener('click', (e) => {
+    e.preventDefault();
+    logout();
+  });
+
   document.getElementById('project-form').addEventListener('submit', addProject);
   document.getElementById('prototype-form').addEventListener('submit', addPrototype);
   document.getElementById('tag-form').addEventListener('submit', addTag);
@@ -35,6 +40,27 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!dot) return;
     document.querySelectorAll('#color-options .color-dot').forEach(d => d.classList.remove('selected'));
     dot.classList.add('selected');
+  });
+
+  // Event delegation for dynamic buttons
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const id = btn.dataset.id;
+
+    if (id && !Storage.isValidId(id)) return;
+
+    switch (action) {
+      case 'delete-tag': deleteTag(id); break;
+      case 'delete-project': deleteProject(id); break;
+      case 'edit-project': editProject(id); break;
+      case 'delete-prototype': deletePrototype(id); break;
+      case 'close-modal': closeEditModal(); break;
+      case 'save-project': saveProject(id); break;
+      case 'toggle-tag': btn.classList.toggle('selected'); break;
+      case 'switch-tab': switchAdminTab(btn.dataset.tab); break;
+    }
   });
 });
 
@@ -51,6 +77,8 @@ function logout() {
 }
 
 function switchAdminTab(tab) {
+  const allowed = ['projects', 'prototypes', 'tags'];
+  if (!allowed.includes(tab)) return;
   document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
   document.querySelector(`.admin-tab-btn[data-tab="${tab}"]`).classList.add('active');
@@ -61,7 +89,6 @@ let currentData = { projects: [], prototypes: [], tags: [] };
 
 function loadData() {
   currentData = Storage.load();
-  if (!currentData.tags) currentData.tags = [];
   renderProjects();
   renderPrototypes();
   renderProjectSelect();
@@ -73,12 +100,12 @@ function loadData() {
 function addTag(e) {
   e.preventDefault();
   const name = document.getElementById('tag-name').value.trim();
+  if (!name || name.length > 30) return;
+
   const selectedDot = document.querySelector('#color-options .color-dot.selected');
-  const color = selectedDot ? selectedDot.dataset.color : '#2563eb';
-  if (!name) return;
+  const color = sanitizeColor(selectedDot ? selectedDot.dataset.color : '');
 
   const data = Storage.load();
-  if (!data.tags) data.tags = [];
   data.tags.push({ id: Storage.generateId(), name, color });
   Storage.save(data);
 
@@ -89,7 +116,7 @@ function addTag(e) {
 function deleteTag(id) {
   if (!confirm('이 태그를 삭제하시겠습니까? 프로젝트에서도 제거됩니다.')) return;
   const data = Storage.load();
-  data.tags = (data.tags || []).filter(t => t.id !== id);
+  data.tags = data.tags.filter(t => t.id !== id);
   data.projects.forEach(p => {
     if (p.tagIds) p.tagIds = p.tagIds.filter(tid => tid !== id);
   });
@@ -99,7 +126,7 @@ function deleteTag(id) {
 
 function renderTags() {
   const list = document.getElementById('tag-list');
-  const tags = currentData.tags || [];
+  const tags = currentData.tags;
   if (tags.length === 0) {
     list.innerHTML = '<li style="color:#9ca3af;font-size:13px;">등록된 태그가 없습니다.</li>';
     return;
@@ -109,10 +136,10 @@ function renderTags() {
     return `
       <li>
         <div style="display:flex;align-items:center;gap:8px;">
-          <span class="tag-badge" style="background:${escapeHtml(t.color)}">${escapeHtml(t.name)}</span>
+          <span class="tag-badge" style="background:${sanitizeColor(t.color)}">${escapeHtml(t.name)}</span>
           <span style="color:#9ca3af;font-size:12px;">${usedCount}개 프로젝트에서 사용 중</span>
         </div>
-        <button class="btn btn-danger" onclick="deleteTag('${t.id}')">삭제</button>
+        <button class="btn btn-danger" data-action="delete-tag" data-id="${escapeAttr(t.id)}">삭제</button>
       </li>
     `;
   }).join('');
@@ -120,23 +147,20 @@ function renderTags() {
 
 function renderProjectTagSelect() {
   const area = document.getElementById('project-tags-select');
-  const tags = currentData.tags || [];
+  const tags = currentData.tags;
   if (tags.length === 0) {
     area.innerHTML = '<p style="color:#9ca3af;font-size:13px;">태그가 없습니다. 제품 태그 관리에서 먼저 추가해주세요.</p>';
     return;
   }
   area.innerHTML = tags.map(t =>
-    `<span class="tag-chip" data-tag-id="${t.id}" style="background:${escapeHtml(t.color)}" onclick="toggleTagChip(this)">${escapeHtml(t.name)}</span>`
+    `<span class="tag-chip" data-action="toggle-tag" data-tag-id="${escapeAttr(t.id)}" style="background:${sanitizeColor(t.color)}">${escapeHtml(t.name)}</span>`
   ).join('');
-}
-
-function toggleTagChip(el) {
-  el.classList.toggle('selected');
 }
 
 function getSelectedTagIds() {
   return Array.from(document.querySelectorAll('#project-tags-select .tag-chip.selected'))
-    .map(el => el.dataset.tagId);
+    .map(el => el.dataset.tagId)
+    .filter(id => Storage.isValidId(id));
 }
 
 // ============ PROJECTS ============
@@ -144,7 +168,8 @@ function addProject(e) {
   e.preventDefault();
   const name = document.getElementById('project-name').value.trim();
   const description = document.getElementById('project-desc').value.trim();
-  if (!name) return;
+  if (!name || name.length > 100) return;
+  if (description.length > 200) return;
 
   const tagIds = getSelectedTagIds();
 
@@ -178,10 +203,10 @@ function editProject(id) {
   const project = data.projects.find(p => p.id === id);
   if (!project) return;
 
-  const tags = data.tags || [];
+  const tags = data.tags;
   const tagChips = tags.map(t => {
     const selected = (project.tagIds || []).includes(t.id) ? 'selected' : '';
-    return `<span class="tag-chip ${selected}" data-tag-id="${t.id}" style="background:${escapeHtml(t.color)}" onclick="toggleTagChip(this)">${escapeHtml(t.name)}</span>`;
+    return `<span class="tag-chip ${selected}" data-action="toggle-tag" data-tag-id="${escapeAttr(t.id)}" style="background:${sanitizeColor(t.color)}">${escapeHtml(t.name)}</span>`;
   }).join('');
 
   const modal = document.createElement('div');
@@ -192,11 +217,11 @@ function editProject(id) {
       <h3>프로젝트 수정</h3>
       <div class="form-group" style="margin-bottom:12px;">
         <label>프로젝트 이름</label>
-        <input type="text" id="edit-name" value="${escapeHtml(project.name)}">
+        <input type="text" id="edit-name" value="${escapeAttr(project.name)}" maxlength="100">
       </div>
       <div class="form-group" style="margin-bottom:12px;">
         <label>설명</label>
-        <input type="text" id="edit-desc" value="${escapeHtml(project.description || '')}">
+        <input type="text" id="edit-desc" value="${escapeAttr(project.description || '')}" maxlength="200">
       </div>
       <div class="form-group" style="margin-bottom:12px;">
         <label>제품 태그</label>
@@ -205,8 +230,8 @@ function editProject(id) {
         </div>
       </div>
       <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeEditModal()">취소</button>
-        <button class="btn btn-primary" onclick="saveProject('${id}')">저장</button>
+        <button class="btn btn-secondary" data-action="close-modal">취소</button>
+        <button class="btn btn-primary" data-action="save-project" data-id="${escapeAttr(id)}">저장</button>
       </div>
     </div>
   `;
@@ -222,9 +247,10 @@ function saveProject(id) {
   const name = document.getElementById('edit-name').value.trim();
   const description = document.getElementById('edit-desc').value.trim();
   const tagIds = Array.from(document.querySelectorAll('#edit-tags-select .tag-chip.selected'))
-    .map(el => el.dataset.tagId);
+    .map(el => el.dataset.tagId)
+    .filter(tid => Storage.isValidId(tid));
 
-  if (!name) return;
+  if (!name || name.length > 100) return;
 
   const data = Storage.load();
   const project = data.projects.find(p => p.id === id);
@@ -246,14 +272,14 @@ function renderProjects() {
     return;
   }
 
-  const tagMap = {};
-  (currentData.tags || []).forEach(t => { tagMap[t.id] = t; });
+  const tagMapLocal = {};
+  currentData.tags.forEach(t => { tagMapLocal[t.id] = t; });
 
   list.innerHTML = currentData.projects.map(p => {
     const protoCount = currentData.prototypes.filter(pt => pt.projectId === p.id).length;
     const tagsHtml = (p.tagIds || []).map(tid => {
-      const tag = tagMap[tid];
-      return tag ? `<span class="tag-badge" style="background:${escapeHtml(tag.color)}">${escapeHtml(tag.name)}</span>` : '';
+      const tag = tagMapLocal[tid];
+      return tag ? `<span class="tag-badge" style="background:${sanitizeColor(tag.color)}">${escapeHtml(tag.name)}</span>` : '';
     }).join('');
 
     return `
@@ -265,8 +291,8 @@ function renderProjects() {
           <span class="badge" style="margin-left:4px;">${protoCount}개 프로토타입</span>
         </div>
         <div class="btn-group">
-          <button class="btn btn-edit" onclick="editProject('${p.id}')">수정</button>
-          <button class="btn btn-danger" onclick="deleteProject('${p.id}')">삭제</button>
+          <button class="btn btn-edit" data-action="edit-project" data-id="${escapeAttr(p.id)}">수정</button>
+          <button class="btn btn-danger" data-action="delete-project" data-id="${escapeAttr(p.id)}">삭제</button>
         </div>
       </li>
     `;
@@ -284,24 +310,26 @@ function renderPrototypes() {
   const projectMap = {};
   currentData.projects.forEach(p => { projectMap[p.id] = p.name; });
 
-  list.innerHTML = currentData.prototypes.map(pt => `
+  list.innerHTML = currentData.prototypes.map(pt => {
+    const figmaHref = sanitizeUrl(pt.figmaUrl);
+    return `
     <li>
       <div style="display:flex;align-items:center;gap:8px;">
         <span class="badge">${escapeHtml(projectMap[pt.projectId] || '-')}</span>
         <strong>${escapeHtml(pt.name)}</strong>
-        <span style="color:#9ca3af;font-size:13px;">${pt.fileName || ''}</span>
-        <span style="color:#9ca3af;font-size:12px;">${pt.createdAt}</span>
-        ${pt.figmaUrl ? `<a href="${escapeHtml(pt.figmaUrl)}" target="_blank" style="font-size:12px;color:#2563eb;">Figma</a>` : ''}
+        <span style="color:#9ca3af;font-size:13px;">${escapeHtml(pt.fileName)}</span>
+        <span style="color:#9ca3af;font-size:12px;">${escapeHtml(pt.createdAt)}</span>
+        ${figmaHref ? `<a href="${escapeAttr(figmaHref)}" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:#2563eb;">Figma</a>` : ''}
       </div>
-      <button class="btn btn-danger" onclick="deletePrototype('${pt.id}')">삭제</button>
+      <button class="btn btn-danger" data-action="delete-prototype" data-id="${escapeAttr(pt.id)}">삭제</button>
     </li>
-  `).join('');
+  `}).join('');
 }
 
 function renderProjectSelect() {
   const select = document.getElementById('proto-project');
   select.innerHTML = '<option value="">프로젝트 선택</option>' +
-    currentData.projects.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+    currentData.projects.map(p => `<option value="${escapeAttr(p.id)}">${escapeHtml(p.name)}</option>`).join('');
 }
 
 function addPrototype(e) {
@@ -310,9 +338,22 @@ function addPrototype(e) {
   const name = document.getElementById('proto-name').value.trim();
   const fileInput = document.getElementById('proto-file');
   const file = fileInput.files[0];
-  const figmaUrl = document.getElementById('proto-figma').value.trim();
+  const figmaUrl = sanitizeUrl(document.getElementById('proto-figma').value.trim());
 
-  if (!projectId || !name || !file) return;
+  if (!projectId || !Storage.isValidId(projectId)) return;
+  if (!name || name.length > 100) return;
+  if (!file) return;
+
+  if (file.size > MAX_FILE_SIZE) {
+    alert(`파일 크기가 너무 큽니다. 최대 ${MAX_FILE_SIZE / 1024 / 1024}MB까지 업로드 가능합니다.`);
+    return;
+  }
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext !== 'html' && ext !== 'htm') {
+    alert('HTML 파일만 업로드 가능합니다.');
+    return;
+  }
 
   const reader = new FileReader();
   reader.onload = function(evt) {
@@ -350,10 +391,4 @@ function deletePrototype(id) {
   data.prototypes = data.prototypes.filter(p => p.id !== id);
   Storage.save(data);
   loadData();
-}
-
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
 }
