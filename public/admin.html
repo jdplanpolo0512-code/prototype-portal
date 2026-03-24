@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Prototype Portal</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="header">
+    <h1>Prototype Portal</h1>
+    <nav>
+      <a href="/">Portal</a>
+      <a href="/admin.html" class="active">Admin</a>
+    </nav>
+  </div>
+
+  <div class="container">
+    <!-- Add Project -->
+    <div class="admin-section">
+      <h2>프로젝트 추가</h2>
+      <form id="project-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>프로젝트 이름</label>
+            <input type="text" id="project-name" required placeholder="프로젝트 이름을 입력하세요">
+          </div>
+          <div class="form-group">
+            <label>설명 (선택)</label>
+            <input type="text" id="project-desc" placeholder="간단한 설명">
+          </div>
+          <button type="submit" class="btn btn-primary" style="height:40px;">추가</button>
+        </div>
+      </form>
+      <ul id="project-list" class="admin-list"></ul>
+    </div>
+
+    <!-- Add Prototype -->
+    <div class="admin-section">
+      <h2>프로토타입 등록</h2>
+      <form id="prototype-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>프로젝트</label>
+            <select id="proto-project" required>
+              <option value="">프로젝트 선택</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>프로토타입 이름</label>
+            <input type="text" id="proto-name" required placeholder="프로토타입 이름">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>HTML 파일</label>
+            <input type="file" id="proto-file" accept=".html" required>
+          </div>
+          <div class="form-group">
+            <label>Figma 링크 (선택)</label>
+            <input type="url" id="proto-figma" placeholder="https://figma.com/...">
+          </div>
+          <button type="submit" class="btn btn-primary" style="height:40px;">등록</button>
+        </div>
+      </form>
+      <ul id="prototype-list" class="admin-list"></ul>
+    </div>
+  </div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>

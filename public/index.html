@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prototype Portal</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="header">
+    <h1>Prototype Portal</h1>
+    <nav>
+      <a href="/" class="active">Portal</a>
+      <a href="/admin.html">Admin</a>
+    </nav>
+  </div>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="card">Card View</button>
+      <button class="tab-btn" data-tab="table">Table View</button>
+    </div>
+
+    <div id="tab-card" class="tab-content active"></div>
+    <div id="tab-table" class="tab-content"></div>
+  </div>
+
+  <script src="/js/portal.js"></script>
+</body>
+</html>
