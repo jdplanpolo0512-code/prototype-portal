@@ -12,10 +12,30 @@
     <nav>
       <a href="index.html">Portal</a>
       <a href="admin.html" class="active">Admin</a>
+      <a href="#" id="logout-btn" style="display:none;" onclick="logout()">Logout</a>
     </nav>
   </div>
 
-  <div class="container">
+  <!-- Login Overlay -->
+  <div id="login-overlay" class="login-overlay">
+    <div class="login-box">
+      <h2>Admin Login</h2>
+      <form id="login-form">
+        <div class="form-group">
+          <label>ID</label>
+          <input type="text" id="login-id" required placeholder="아이디를 입력하세요" autocomplete="username">
+        </div>
+        <div class="form-group" style="margin-top:12px;">
+          <label>Password</label>
+          <input type="password" id="login-pw" required placeholder="비밀번호를 입력하세요" autocomplete="current-password">
+        </div>
+        <p id="login-error" style="color:#ff3b30;font-size:13px;margin-top:8px;display:none;">아이디 또는 비밀번호가 올바르지 않습니다.</p>
+        <button type="submit" class="btn btn-primary" style="width:100%;height:42px;margin-top:16px;justify-content:center;">로그인</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="container" id="admin-content" style="display:none;">
     <!-- Add Project -->
     <div class="admin-section">
       <h2>프로젝트 추가</h2>

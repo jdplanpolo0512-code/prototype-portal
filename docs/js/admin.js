@@ -1,8 +1,45 @@
+const ADMIN_HASH = 'b0af13f7bca765b431e4beb5121c96f2232575cc766248204a7d99fb9809b3e8';
+
+async function sha256(text) {
+  const encoded = new TextEncoder().encode(text);
+  const buffer = await crypto.subtle.digest('SHA-256', encoded);
+  return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  loadData();
+  if (sessionStorage.getItem('admin-auth') === 'true') {
+    showAdmin();
+  }
+
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('login-id').value.trim();
+    const pw = document.getElementById('login-pw').value;
+    const hash = await sha256(id + ':' + pw);
+
+    if (hash === ADMIN_HASH) {
+      sessionStorage.setItem('admin-auth', 'true');
+      showAdmin();
+    } else {
+      document.getElementById('login-error').style.display = 'block';
+    }
+  });
+
   document.getElementById('project-form').addEventListener('submit', addProject);
   document.getElementById('prototype-form').addEventListener('submit', addPrototype);
 });
+
+function showAdmin() {
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('admin-content').style.display = 'block';
+  document.getElementById('logout-btn').style.display = 'inline';
+  loadData();
+}
+
+function logout() {
+  sessionStorage.removeItem('admin-auth');
+  location.reload();
+}
 
 let currentData = { projects: [], prototypes: [] };
 
