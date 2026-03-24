@@ -124,29 +124,45 @@ function addPrototype(e) {
   e.preventDefault();
   const projectId = document.getElementById('proto-project').value;
   const name = document.getElementById('proto-name').value.trim();
-  const url = document.getElementById('proto-url').value.trim();
+  const fileInput = document.getElementById('proto-file');
+  const file = fileInput.files[0];
   const figmaUrl = document.getElementById('proto-figma').value.trim();
 
-  if (!projectId || !name || !url) return;
+  if (!projectId || !name || !file) return;
 
-  const data = Storage.load();
-  data.prototypes.push({
-    id: Storage.generateId(),
-    projectId,
-    name,
-    url,
-    figmaUrl,
-    createdAt: new Date().toISOString().slice(0, 10)
-  });
-  Storage.save(data);
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const htmlContent = evt.target.result;
+    const id = Storage.generateId();
 
-  document.getElementById('prototype-form').reset();
-  loadData();
+    try {
+      Storage.saveFile(id, htmlContent);
+    } catch (err) {
+      alert('파일 저장 실패: 브라우저 저장 용량을 초과했습니다. 기존 프로토타입을 삭제 후 다시 시도해주세요.');
+      return;
+    }
+
+    const data = Storage.load();
+    data.prototypes.push({
+      id,
+      projectId,
+      name,
+      fileName: file.name,
+      figmaUrl,
+      createdAt: new Date().toISOString().slice(0, 10)
+    });
+    Storage.save(data);
+
+    document.getElementById('prototype-form').reset();
+    loadData();
+  };
+  reader.readAsText(file);
 }
 
 function deleteProject(id) {
   if (!confirm('이 프로젝트와 관련 프로토타입이 모두 삭제됩니다. 계속하시겠습니까?')) return;
   const data = Storage.load();
+  data.prototypes.filter(p => p.projectId === id).forEach(p => Storage.deleteFile(p.id));
   data.projects = data.projects.filter(p => p.id !== id);
   data.prototypes = data.prototypes.filter(p => p.projectId !== id);
   Storage.save(data);
@@ -155,6 +171,7 @@ function deleteProject(id) {
 
 function deletePrototype(id) {
   if (!confirm('이 프로토타입을 삭제하시겠습니까?')) return;
+  Storage.deleteFile(id);
   const data = Storage.load();
   data.prototypes = data.prototypes.filter(p => p.id !== id);
   Storage.save(data);

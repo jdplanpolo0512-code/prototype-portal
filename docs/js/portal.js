@@ -18,6 +18,17 @@ function loadData() {
   renderTableView(data);
 }
 
+function openPrototype(id) {
+  const html = Storage.getFile(id);
+  if (!html) {
+    alert('HTML 파일을 찾을 수 없습니다.');
+    return;
+  }
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+}
+
 function renderCardView({ projects, prototypes }) {
   const container = document.getElementById('tab-card');
 
@@ -36,13 +47,13 @@ function renderCardView({ projects, prototypes }) {
         </div>
         <div class="card-body">
           ${protos.length === 0
-            ? '<p style="color:#86868b;font-size:13px;padding:10px 0;">프로토타입 없음</p>'
+            ? '<p style="color:#9ca3af;font-size:13px;padding:10px 0;">프로토타입 없음</p>'
             : protos.map(proto => `
               <div class="proto-item">
                 <span class="proto-name">${escapeHtml(proto.name)}</span>
                 <div class="proto-links">
                   ${proto.figmaUrl ? `<a href="${escapeHtml(proto.figmaUrl)}" target="_blank" class="btn btn-figma">Figma</a>` : ''}
-                  <a href="${escapeHtml(proto.url)}" target="_blank" class="btn btn-primary">Open</a>
+                  <button onclick="openPrototype('${proto.id}')" class="btn btn-primary">HTML</button>
                 </div>
               </div>
             `).join('')
@@ -72,6 +83,7 @@ function renderTableView({ projects, prototypes }) {
         <tr>
           <th>프로젝트</th>
           <th>프로토타입</th>
+          <th>파일명</th>
           <th>등록일</th>
           <th>링크</th>
         </tr>
@@ -81,11 +93,12 @@ function renderTableView({ projects, prototypes }) {
           <tr>
             <td><span class="badge">${escapeHtml(projectMap[proto.projectId] || '-')}</span></td>
             <td>${escapeHtml(proto.name)}</td>
+            <td style="color:#6b7280;font-size:13px;">${escapeHtml(proto.fileName || '-')}</td>
             <td>${proto.createdAt}</td>
             <td>
               <div class="proto-links">
                 ${proto.figmaUrl ? `<a href="${escapeHtml(proto.figmaUrl)}" target="_blank" class="btn btn-figma">Figma</a>` : ''}
-                <a href="${escapeHtml(proto.url)}" target="_blank" class="btn btn-primary">Open</a>
+                <button onclick="openPrototype('${proto.id}')" class="btn btn-primary">HTML</button>
               </div>
             </td>
           </tr>
